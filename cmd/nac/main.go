@@ -1,9 +1,11 @@
 package main
 
 import (
+	"os"
+
 	nac "github.com/dextryz/nostr-article-cli"
 )
 
 func main() {
-	nac.Main()
+	os.Exit(nac.Main())
 }
