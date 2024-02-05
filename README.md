@@ -1,50 +1,49 @@
 # Nostr Article CLI
 
-Nostr CLI to manage long form content
+Read-only CLI for long form content on [nostr](www.nostr.com). To manage your article with write permissions use the [Nostr Knowledge Management](https://github.com/dextryz/nkm) client.
 
-Create your `config.json` in `~/.config/nostr/config.json` like below
+## Setup
+
+Create your config file in `~/.config/nostr/article.json` containing:
 
 ```
 {
   "relays": ["wss://relay.damus.io"],
-  "nsec": "nsec1xxxxxx"
+  "npub": "npub14ge829c4pvgx24c35qts3sv82wc2xwcmgng93tzp6d52k9de2xgqq0y4jk"
 }
 ```
 
+Finally, set your environment variable:
+
 ```shell
-> nart list
+export NOSTR_CONFIG=~/.config/nostr/article.json`
+```
+
+Build the executable
+
+```shell
+make build
+```
+
+## Usage
+
+View two articles
+
+```shell
+> nart list 2
 The Art of War
 naddr...
 
 Channels in Go
 naddr...
+```
 
+## Todo
+
+```shell
+# List articles whoes content contains the following keyword.
 > nart search "hello friend"
 
-> nart tagged "coding,go"
+# List articles with the following tags.
+> nart tag "coding,go"
 ```
-
-Tag a note
-
-```shell
-> nart tag 202402060643.md coding go nostr
-
-> nart title 202402060643.md 'My New Note'
-```
-
-Commit a markdown file to the set of relays
-
-```shell
-> nart commit 202402060643.md
-```
-
-## Ideas
-
-Myabe have it sudh that you env set the current article:
-
-```shell
-> nart new
-touch 202402060643.md
-export ARTICLE=202402060643.md
-```
-

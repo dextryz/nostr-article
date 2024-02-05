@@ -1,100 +1,108 @@
 package nostrarticlecli
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
-	"io"
+	"log"
 	"os"
-	"strings"
+	"strconv"
 
 	np "github.com/dextryz/nostr-pipeline"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
-type article struct {
-	input  io.Reader
-	output io.Writer
+type Config struct {
+	Npub   string   `json:"npub"`
+	Relays []string `json:"relays"`
 }
 
-type option func(*article) error
-
-func WithInputFromArgs(args []string) option {
-	return func(c *article) error {
-		if len(args) < 1 {
-			return nil
-		}
-		c.input = strings.NewReader(args[0])
-		return nil
+func StringEnv(key string) string {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		log.Fatalf("env variable \"%s\" not set, usual", key)
 	}
+	return value
 }
 
-func New(opts ...option) (*article, error) {
-	c := &article{
-		input:  os.Stdin,
-		output: os.Stdout,
+var CONFIG = StringEnv("NOSTR_CONFIG")
+
+func loadConfig() (*Config, error) {
+	b, err := os.ReadFile(CONFIG)
+	if err != nil {
+		return nil, err
 	}
-	for _, opt := range opts {
-		err := opt(c)
+	var cfg Config
+	err = json.Unmarshal(b, &cfg)
+	if err != nil {
+		return nil, err
+	}
+	if len(cfg.Relays) == 0 {
+		log.Println("please set atleast on relay in your config.json")
+	}
+	return &cfg, nil
+}
+
+func Titles(cfg *Config, limit int) {
+
+	_, pk, err := nip19.Decode(cfg.Npub)
+	if err != nil {
+		panic(err)
+	}
+
+	f := nostr.Filter{
+		Kinds:   []int{nostr.KindArticle},
+		Authors: []string{pk.(string)},
+		Limit:   limit,
+	}
+	naddrs := np.New(cfg.Relays[0]).Filter(f).Query().Naddrs()
+
+	for _, naddr := range naddrs {
+
+		prefix, data, err := nip19.Decode(naddr)
 		if err != nil {
-			return nil, err
-		}
-	}
-	return c, nil
-}
-
-func (c *article) Title() int {
-	lines := 0
-	input := bufio.NewScanner(c.input)
-	for input.Scan() {
-		//pipeline := np.New("wss://relay.damus.io/")
-		//titles := wpipeline.Authors([]string{input.Text()}).Kinds([]int{nostr.KindArticle}).Query().Titles()
-
-        ids := np.New("wss://relay.damus.io/").Authors([]string{input.Text()}).Kinds([]int{nostr.KindArticle}).Query().Ids("wss://relay.damus.io/", "npub14ge829c4pvgx24c35qts3sv82wc2xwcmgng93tzp6d52k9de2xgqq0y4jk")
-
-        for _, naddr := range ids {
-
-            prefix, data, err := nip19.Decode(naddr)
-            if err != nil {
-                fmt.Errorf("shouldn't error: %s", err)
-            }
-
-            if prefix != "naddr" {
-                fmt.Errorf("returned invalid prefix")
-            }
-
-            ep := data.(nostr.EntityPointer)
-            if ep.Kind != nostr.KindArticle {
-                fmt.Errorf("returned wrong kind")
-            }
-
-			fmt.Println(ep.Identifier)
-			fmt.Println(naddr)
-			fmt.Println("")
+			log.Fatalf("shouldn't error: %s", err)
 		}
 
-	}
-	return lines
-}
+		if prefix != "naddr" {
+			log.Fatalf("returned invalid prefix")
+		}
 
-func (c *article) Tags() int {
-	lines := 0
-	input := bufio.NewScanner(c.input)
-	for input.Scan() {
-		pipeline := np.New("wss://relay.damus.io/")
-		pipeline.Authors([]string{input.Text()}).Kinds([]int{nostr.KindArticle}).Query().Tags().SortByCount().Stdout()
+		ep := data.(nostr.EntityPointer)
+		if ep.Kind != nostr.KindArticle {
+			log.Fatalf("returned wrong kind")
+		}
+
+		fmt.Println(ep.Identifier)
+		fmt.Println(naddr)
+		fmt.Println("")
 	}
-	return lines
 }
 
 func Main() int {
-	c, err := New(
-		WithInputFromArgs(os.Args[1:]),
-	)
+
+	cfg, err := loadConfig()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		log.Fatalln(err)
+	}
+
+	args := os.Args[1:]
+
+	if args[0] == "list" {
+
+        if len(args) != 2 {
+            log.Fatalln("provide the number of articles to list")
+        }
+
+		limit, err := strconv.Atoi(args[1])
+		if err != nil {
+			log.Fatalln(err)
+		}
+		Titles(cfg, limit)
+	} else {
+		log.Fatalln("option not aviable")
 		return 1
 	}
-	c.Title()
+
 	return 0
 }

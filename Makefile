@@ -2,5 +2,5 @@ fmt:
 	go mod tidy -compat=1.17
 	gofmt -l -s -w .
 
-run:
-	go run ./cmd/nac
+build:
+	go build -o nart ./cmd/nart
